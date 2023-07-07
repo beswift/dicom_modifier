@@ -26,11 +26,11 @@ class DicomFile:
                 if tag in self.dataset:
                     if tag == "(0018, 9073)" or tag == "AcquisitionDuration":  # Acquisition Duration
                         value = float(value)
-                if tag in ('DepthSpatialResolution',"AcquisitionDuration",'MaximumDepthDistortion','AlongScanSpatialResolution','AcrossScanSpatialResolution','IlluminationBandwidth','IlluminationPower','IlluminationWaveLength','MaximumAcrossScanDistortion','MaximumAlongScanDistortion','MaximumDepthDistortion','HorizontalFieldOfView'):
+                if tag in ('DepthSpatialResolution',"AcquisitionDuration",'MaximumDepthDistortion','AlongScanSpatialResolution','AcrossScanSpatialResolution','IlluminationBandwidth','IlluminationPower','IlluminationWaveLength','MaximumAcrossScanDistortion','MaximumAlongScanDistortion','MaximumDepthDistortion','HorizontalFieldOfView','RescaleIntercept','RescaleSlope'):
                     print(tag)# Acquisition Duration
                     value = float(value)
                     print(f'VALUE: {value}')
-                if tag in('InConcatenationNumber','InConcatenationTotalNumber','ConcatenationFrameOffsetNumber','BitsAllocated','BitsStored','Columns','ConcatenationFrameOffsetNumber','HighBit','InstanceNumber','PixelRepresentation','RescaleIntercept','RescaleSlope','Rows','SamplesPerPixel','SeriesNumber'):
+                if tag in('InConcatenationNumber','InConcatenationTotalNumber','ConcatenationFrameOffsetNumber','BitsAllocated','BitsStored','Columns','ConcatenationFrameOffsetNumber','HighBit','InstanceNumber','PixelRepresentation','Rows','SamplesPerPixel','SeriesNumber','SmallestImagePixelValue','LargestImagePixelValue','PlanarConfiguration','RepresentativeFrameNumber'):
                     print(tag)
                     value = int(value)
                     print(f'Value: {value}')
@@ -49,13 +49,17 @@ class DicomFile:
             print(f"Saving DICOM file to {output_path}")
             print(f"saving {self.dataset} to {output_path}")
             self.dataset.save_as(output_path)
+            return self.dataset, output_path
         except ValueError:
             print(f"Unable to set {tag} to {value}")
             print('this is the first fail')
+            traceback.print_exc()
         except:
             print(f"Unable to save DICOM file issue with {tag} to {value}")
             traceback.print_exc()
             print('hey did this fucking work?')
+
+
     def modify_tags(self, updated_tags):
         for tag, value in updated_tags.items():
             try:
