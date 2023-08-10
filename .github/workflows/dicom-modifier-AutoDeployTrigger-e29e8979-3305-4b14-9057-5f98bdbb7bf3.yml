@@ -1,0 +1,42 @@
+name: Trigger auto deployment for dicom-modifier
+
+# When this action will be executed
+on:
+  # Automatically trigger it when detected changes in repo
+  push:
+    branches: 
+      [ main ]
+    paths:
+    - 'app/**'
+    - '.github/workflows/dicom-modifier-AutoDeployTrigger-e29e8979-3305-4b14-9057-5f98bdbb7bf3.yml'
+
+  # Allow mannually trigger 
+  workflow_dispatch:
+      
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout to the branch
+        uses: actions/checkout@v2
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.DICOMMODIFIER_AZURE_CREDENTIALS }}
+
+      - name: Build and push container image to registry
+        uses: azure/container-apps-deploy-action@v1
+        with:
+          appSourcePath: ${{ github.workspace }}/app 
+          registryUrl: duckling.azurecr.io
+          registryUsername: ${{ secrets.DICOMMODIFIER_REGISTRY_USERNAME }}
+          registryPassword: ${{ secrets.DICOMMODIFIER_REGISTRY_PASSWORD }}
+          containerAppName: dicom-modifier
+          resourceGroup: ml
+          imageToBuild: duckling.azurecr.io/dicom-modifier:${{ github.sha }}
+          dockerfilePath: Dockerfile
+
+     
+
