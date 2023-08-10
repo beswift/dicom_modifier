@@ -3,4 +3,5 @@ pydicom
 pylibjpeg
 pylibjpeg-libjpeg
 gdcm
+opencv-python-headless
 
