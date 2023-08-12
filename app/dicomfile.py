@@ -1,7 +1,9 @@
 from pydicom.tag import Tag
-
+import cv2
 import traceback
 import pydicom
+import numpy as np
+import streamlit as st
 
 class DicomFile:
     def __init__(self, file):
@@ -46,6 +48,8 @@ class DicomFile:
                     print(f'Value: {value}')
                 self.dataset[tag].value = value
             # Save the new DICOM file
+            filename = self.dataset.get("PatientName", "anonymous.dcm")
+
             print(f"Saving DICOM file to {output_path}")
             print(f"saving {self.dataset} to {output_path}")
             self.dataset.save_as(output_path)
@@ -72,3 +76,60 @@ class DicomFile:
 
     def write_file(self, output_path):
         self.dataset.save_as(output_path)
+
+    def ybr_to_rgb(self,image_data):
+        if image_data.shape[2] == 3:
+            return cv2.cvtColor(image_data, cv2.COLOR_YCrCb2BGR)
+        return image_data
+
+    def display_image(self,dicom_file):
+        try:
+            image_data = dicom_file.extract_image()
+
+            # Normalize the pixel values
+            #image_data = (image_data - np.min(image_data)) / (np.max(image_data) - np.min(image_data))
+            #image_data = (image_data * 255).astype(np.uint8)
+
+            # Check if the image is grayscale
+            if len(image_data.shape) == 2 or image_data.shape[2] == 1:
+                image_data = np.stack([image_data] * 3, axis=-1)  # Convert grayscale to RGB
+            else:
+                # Convert YBR to RGB if necessary
+                photometric_interpretation = dicom_file.dataset.get("PhotometricInterpretation", None)
+                print(f'photometric interpretation: {photometric_interpretation}')
+                if photometric_interpretation == "YBR_FULL_422":
+                    print('converting to rgb')
+                    image_data = self.ybr_to_rgb(image_data)
+                if photometric_interpretation == "MONOCHROME1":
+                    image_data = np.max(image_data) - image_data
+                if photometric_interpretation == "MONOCHROME2":
+                    image_data = image_data
+                if photometric_interpretation == "RGB":
+                    if st.checkbox("invert"):
+                        image_data = image_data
+                    else:
+                        image_data = self.ybr_to_rgb(image_data)
+
+            st.image(image_data, caption="DICOM Image")
+
+        except:
+            traceback.print_exc()
+            # Handle multiple slices if the DICOM file is a 3D volume
+
+            try:
+                image_stack = dicom_file.extract_image()
+                image_stack = (image_stack - np.min(image_stack)) / (
+                        np.max(image_stack) - np.min(image_stack))
+                slice_index = st.slider('Slice index', 0, image_stack.shape[0], image_stack.shape[0] // 255)
+                st.image(image_stack[slice_index, :, :], caption=f"DICOM Image (slice {slice_index})", clamp=True)
+            except:
+                st.write("No image found")
+                traceback.print_exc()
+                try:
+                    image_stack = dicom_file.extract_image()
+                    slice_index = st.slider('Slice index3', 0, image_stack.shape[0] - 1, image_stack.shape[0] // 2)
+                    st.image(image_stack[slice_index, :, :], caption=f"DICOM Image (slice {slice_index})",
+                             clamp=True)
+                except:
+                    traceback.print_exc()
+

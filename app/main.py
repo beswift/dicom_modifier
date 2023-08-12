@@ -1,56 +1,32 @@
 import streamlit as st
 from dicomfile import DicomFile
 import numpy as np
+import cv2
 import traceback
 from pydicom.filebase import DicomBytesIO
-import cv2
+import openai
+
 
 def main():
     st.set_page_config(layout="wide")
     st.title("DICOM Modifier")
     st.subheader("A Simple interface for updating DICOM Tags.")
-    st.write("Please upload a DICOM file to get started.")
+    st.write("")
 
-    def ybr_to_rgb(image_data):
-        if image_data.shape[2] == 3:
-            return cv2.cvtColor(image_data, cv2.COLOR_YCrCb2BGR)
-        return image_data
-
-    def display_image(dicom_file):
-        try:
-            image_data = dicom_file.extract_image()
-
-            # Normalize the pixel values
-            #image_data = (image_data - np.min(image_data)) / (np.max(image_data) - np.min(image_data))
-           # image_data = (image_data * 255).astype(np.uint8)
-
-            # Check if the image is grayscale
-            if len(image_data.shape) == 2 or image_data.shape[2] == 1:
-                image_data = np.stack([image_data] * 3, axis=-1)  # Convert grayscale to RGB
-            else:
-                # Convert YBR to RGB if necessary
-                #photometric_interpretation = dicom_file.get("PhotometricInterpretation", "").value
-                #if photometric_interpretation == "YBR_FULL_422":
-                image_data = ybr_to_rgb(image_data)
-
-            st.image(image_data, caption="DICOM Image")
-
-        except:
-            traceback.print_exc()
-            # Handle multiple slices if the DICOM file is a 3D volume
-            try:
-                slice_index = st.slider('Slice index', 0, image_data.shape[0] - 1, image_data.shape[0] // 2)
-                st.image(image_data[slice_index, :, :], caption=f"DICOM Image (slice {slice_index})")
-            except:
-                st.write("Error displaying image")
-                traceback.print_exc()
 
     if not 'dataset' in st.session_state:
         st.session_state.dataset = None
     if not 'filepath' in st.session_state:
         st.session_state.filepath = None
+    if not 'tags' in st.session_state:
+        st.session_state.tags = None
 
-    uploaded_file = st.file_uploader("Upload DICOM file")
+
+
+    ucol1,ucol2,ucol3 = st.columns([1,1,1])
+    with ucol2:
+        uploaded_file = st.file_uploader("Please upload a DICOM file to get started.")
+    st.divider()
     if uploaded_file is not None:
         dicom_file = DicomFile(uploaded_file)
         upload_container = st.container()
@@ -58,35 +34,20 @@ def main():
             upload,_,preview = st.columns([1,.2,1])
         with upload:
             try:
-                display_image(dicom_file)
-            except:
-                try:
-                    image_stack = dicom_file.extract_image()
-                    slice_index = st.slider('Slice index', 0, image_stack.shape[0] - 1, image_stack.shape[0] // 2)
-                    st.image(image_stack[slice_index, :, :], caption=f"DICOM Image (slice {slice_index})")
+                st.write("DICOM Image Preview")
+                dicom_file.display_image(dicom_file)
 
-                except:
-                    st.write("No image found")
-                    traceback.print_exc()
-                    try:
-                        image_stack = dicom_file.extract_image()
-                        image_stack = (image_stack - np.min(image_stack)) / (
-                                    np.max(image_stack) - np.min(image_stack))
-                        slice_index = st.slider('second Slice index', 0, image_stack.shape[0] , image_stack.shape[0] // 255)
-                        st.image(image_stack[slice_index, :, :], caption=f"DICOM Image (slice {slice_index})", clamp=True)
-                    except:
-                        st.write("No image found")
-                        traceback.print_exc()
-                        try:
-                            image_stack = dicom_file.extract_image()
-                            slice_index = st.slider('Slice index3', 0, image_stack.shape[0] - 1, image_stack.shape[0] // 2)
-                            st.image(image_stack[slice_index, :, :], caption=f"DICOM Image (slice {slice_index})",
-                                     clamp=True)
-                        except:
-                            traceback.print_exc()
+            except:
+                st.write("Image Could Not Be Rendered")
+                traceback.print_exc()
 
         with preview:
-            st.write("DICOM tags")
+            header,reset = st.columns([1,1])
+            with header:
+                st.write("DICOM tags")
+
+
+
             try:
                 tags = dicom_file.extract_tags()
                 #print(tags)
@@ -95,10 +56,54 @@ def main():
                 if 'PatientName' in tags:
                     if not isinstance(tags['PatientName'], str):
                         tags['PatientName'] = str(tags['PatientName'])
-                editable_tags = {tag: value for tag, value in tags.items() if isinstance(value, (str, int, float))}
-                #
+                patientNamePreview = st.empty()
+                patientNamePreview.write(f'Current Patient Name: {tags["PatientName"]}')
+                # Check if we have a stored name
+                if 'anonymized_name' not in st.session_state:
+                    st.session_state.anonymized_name = ''
+
+                # UI components for anonymization
+                anonymize_container = st.container()
+                with anonymize_container:
+                    st.write("Anonymize DICOM")
+                    col1, col2, col3 = st.columns(3)
+                    # Text input for manual name entry
+                    col1.divider()
+                    entered_name = col1.text_input("Enter a new name to use:", st.session_state.anonymized_name)
+                    st.session_state.anonymized_name = entered_name
+
+                    editable_tags = {tag: value for tag, value in tags.items() if isinstance(value, (str, int, float))}
+                    # Button to generate a random name
+                    col2.divider()
+                    if col1.button("Generate Random Name"):
+                        # Here, we generate a random name using any method of your choice.
+                        # For simplicity, I'm just using a random number. Replace this with a name generator if you have one.
+                        generated_name = f"Patient^{np.random.randint(1000, 9999)}"
+                        st.session_state.anonymized_name = generated_name
+                        # rerun the text input with the new name
+                        #st.experimental_rerun()
+
+                    # Button to apply the name to the DICOM file
+                    col3.divider()
+                    if col1.button("Apply Name"):
+                        st.session_state.anonymized_name = entered_name
+                        tags['PatientName'] = st.session_state.anonymized_name
+                        editable_tags['PatientName'] = st.session_state.anonymized_name
+                        dicom_file.modify_tags({"PatientName": st.session_state.anonymized_name})
+                        patientNamePreview.write(f'Current Patient Name: {st.session_state.anonymized_name}')
+                        st.session_state.tags = tags
+
+
+
                 updated_tags = st.data_editor(editable_tags)
+                if st.session_state.anonymized_name != None:
+                    updated_tags['PatientName'] = st.session_state.anonymized_name
+
+                    print(f'updated tags: {updated_tags}')
+
                 dicom_file.modify_tags(updated_tags)
+                filename = f'{dicom_file.dataset.get("PatientName")}-{dicom_file.dataset.get("StudyDate")}-{dicom_file.dataset.get("ManufacturerModelName")}-{dicom_file.dataset.get("ImageLaterality")}.dcm'
+                print(f"Saving DICOM file to {filename}")
 
 
             except:
@@ -107,7 +112,7 @@ def main():
                 traceback.print_exc()
         try:
             if tags:
-                output_path = st.text_input("Enter output path")
+                output_path = st.text_input("Enter output path", filename)
                 if st.button("Save"):
                     dataset, filepath = dicom_file.modify_and_save_dicom_file(updated_tags, output_path)
                     st.session_state.dataset = dataset
@@ -115,7 +120,7 @@ def main():
                     st.success("File saved successfully")
                 if st.session_state.dataset is not None:
                     dataset = st.session_state.dataset
-                    filepath = st.session_state.filepath
+                    output_path = st.session_state.filepath
                     with DicomBytesIO() as f:
                         dataset.save_as(f, write_like_original=True)
                         dicom_bytes = f.parent.getvalue()
@@ -127,6 +132,8 @@ def main():
         except:
             traceback.print_exc()
             st.write("No Tags found, Upload a DICOM file to get started")
+
+    #st._rerun()
 
 if __name__ == "__main__":
     main()
