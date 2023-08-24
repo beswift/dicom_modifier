@@ -4,6 +4,7 @@ import traceback
 import pydicom
 import numpy as np
 import streamlit as st
+from pydicom.encaps import encapsulate
 
 class DicomFile:
     def __init__(self, file):
@@ -52,6 +53,9 @@ class DicomFile:
 
             print(f"Saving DICOM file to {output_path}")
             print(f"saving {self.dataset} to {output_path}")
+            if self.dataset.file_meta.TransferSyntaxUID.is_compressed:
+                # Encapsulate the compressed Pixel Data
+                self.dataset.PixelData = encapsulate([self.dataset.PixelData])
             self.dataset.save_as(output_path)
             return self.dataset, output_path
         except ValueError:

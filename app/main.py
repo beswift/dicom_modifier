@@ -5,7 +5,7 @@ import cv2
 import traceback
 from pydicom.filebase import DicomBytesIO
 import openai
-
+from pydicom.encaps import encapsulate
 
 def main():
     st.set_page_config(layout="wide")
@@ -36,6 +36,37 @@ def main():
             try:
                 st.write("DICOM Image Preview")
                 dicom_file.display_image(dicom_file)
+                # Check if the user wants to modify the DICOM image
+                if st.checkbox("Modify DICOM Image to Hide Sensitive Information"):
+                    # Display the DICOM image for the user to select a region
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.checkbox("invert"):
+                            image_data =dicom_file.extract_image()
+                            st.image(image_data, caption="DICOM Image")
+                        else:
+                            image_data = cv2.cvtColor(dicom_file.extract_image(), cv2.COLOR_YCrCb2BGR)
+                            st.image(image_data, caption="DICOM Image")
+                    with col2:
+                        st.write("Select a region and choose a background color to hide sensitive information.")
+                        # Get the coordinates of the region selected by the user
+                        x1 = st.number_input("Start X Coordinate", 0, dicom_file.dataset.Columns, value=10)
+                        y1 = st.number_input("Start Y Coordinate", 0, dicom_file.dataset.Rows, value=76)
+                        x2 = st.number_input("End X Coordinate", x1+300, dicom_file.dataset.Columns)
+                        y2 = st.number_input("End Y Coordinate", y1+50, dicom_file.dataset.Rows)
+                        # Get the background color selected by the user
+                        bg_color = st.color_picker("Background Color")
+                        # Convert the DICOM image to RGB format
+                        image_data = cv2.cvtColor(dicom_file.extract_image(), cv2.COLOR_YCrCb2BGR)
+                        # Apply the selected color over the selected region
+                        image_data[y1:y2, x1:x2] = np.array(
+                            [int(bg_color[1:3], 16), int(bg_color[3:5], 16), int(bg_color[5:7], 16)])
+                        # Update the pixel data of the DICOM dataset
+                        dicom_file.dataset.PixelData = image_data.tobytes()
+                        # Display the modified DICOM image
+                        st.image(image_data, caption="Modified DICOM Image")
+
+
 
             except:
                 st.write("Image Could Not Be Rendered")
