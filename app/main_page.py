@@ -69,22 +69,32 @@ def main():
                     col1, col2, col3 = st.columns(3)
                     # Text input for manual name entry
                     col1.divider()
+                    anony_name = st.empty()
                     entered_name = col1.text_input("Enter a new name to use:", st.session_state.anonymized_name)
+
                     st.session_state.anonymized_name = entered_name
 
                     editable_tags = {tag: value for tag, value in tags.items() if isinstance(value, (str, int, float))}
                     # Button to generate a random name
                     col2.divider()
-                    if col1.button("Generate Random Name"):
+                    col3.divider()
+                    if col2.button("Generate & Apply Random Name"):
                         # Here, we generate a random name using any method of your choice.
                         # For simplicity, I'm just using a random number. Replace this with a name generator if you have one.
                         generated_name = f"Patient^{np.random.randint(1000, 9999)}"
                         st.session_state.anonymized_name = generated_name
+                        anony_name.write(generated_name)
+                        st.session_state.anonymized_name = generated_name
+                        tags['PatientName'] = st.session_state.anonymized_name
+                        editable_tags['PatientName'] = st.session_state.anonymized_name
+                        dicom_file.modify_tags({"PatientName": st.session_state.anonymized_name})
+                        patientNamePreview.write(f'Current Patient Name: {st.session_state.anonymized_name}')
+                        st.session_state.tags = tags
                         # rerun the text input with the new name
                         #st.experimental_rerun()
 
                     # Button to apply the name to the DICOM file
-                    col3.divider()
+
                     if col1.button("Apply Name"):
                         st.session_state.anonymized_name = entered_name
                         tags['PatientName'] = st.session_state.anonymized_name

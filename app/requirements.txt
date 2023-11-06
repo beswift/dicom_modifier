@@ -5,4 +5,4 @@ pylibjpeg-libjpeg
 gdcm
 opencv-python-headless
 openai
-
+fastapi
